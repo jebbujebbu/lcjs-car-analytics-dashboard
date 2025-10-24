@@ -1,24 +1,22 @@
-import logo from './logo.svg';
 import './App.css';
+import { LCHost } from './LC';
+import ParallelChart from './Components/ParallelChart';
+import BarChart from './Components/BarChart';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    // NOTE: LCHost should be defined at the top of component tree, before any and all LCJS based components
+    // This let's them share the same LC context for performance benefits.
+    <LCHost>
+      <div className="App">
+        <div className="chart">
+          <ParallelChart/>
+        </div>
+        <div className="chart">
+          <BarChart/>
+        </div>
+      </div>
+    </LCHost>
   );
 }
 

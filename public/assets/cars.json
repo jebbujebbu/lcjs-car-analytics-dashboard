@@ -1,0 +1,14 @@
+[
+  { "Model": "Falcon S", "Manufacturer": "Apex Motors", "Horsepower": 220, "Weight": 1350, "FuelEfficiency": 16, "Price": 45 },
+  { "Model": "Raptor X", "Manufacturer": "Apex Motors", "Horsepower": 350, "Weight": 1650, "FuelEfficiency": 10, "Price": 80 },
+  { "Model": "Civic R", "Manufacturer": "Neo Auto", "Horsepower": 180, "Weight": 1250, "FuelEfficiency": 18, "Price": 35 },
+  { "Model": "Spectra GT", "Manufacturer": "Neo Auto", "Horsepower": 300, "Weight": 1400, "FuelEfficiency": 12, "Price": 70 },
+  { "Model": "Terra EV", "Manufacturer": "Voltura", "Horsepower": 400, "Weight": 1900, "FuelEfficiency": 25, "Price": 95 },
+  { "Model": "Voltura S", "Manufacturer": "Voltura", "Horsepower": 250, "Weight": 1600, "FuelEfficiency": 22, "Price": 65 },
+  { "Model": "Dyno X", "Manufacturer": "Turbine Works", "Horsepower": 450, "Weight": 1800, "FuelEfficiency": 9, "Price": 120 },
+  { "Model": "Breeze", "Manufacturer": "EcoDrive", "Horsepower": 150, "Weight": 1100, "FuelEfficiency": 20, "Price": 28 },
+  { "Model": "Phantom GT", "Manufacturer": "Turbine Works", "Horsepower": 520, "Weight": 2000, "FuelEfficiency": 8, "Price": 160 },
+  { "Model": "Whisper", "Manufacturer": "EcoDrive", "Horsepower": 140, "Weight": 1150, "FuelEfficiency": 21, "Price": 30 },
+  { "Model": "Aero GT", "Manufacturer": "Apex Motors", "Horsepower": 370, "Weight": 1600, "FuelEfficiency": 12, "Price": 95 },
+  { "Model": "Eclipse", "Manufacturer": "Voltura", "Horsepower": 420, "Weight": 1850, "FuelEfficiency": 21, "Price": 110 }
+]
