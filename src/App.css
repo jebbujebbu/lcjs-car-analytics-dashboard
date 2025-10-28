@@ -1,29 +1,26 @@
-.App {
-  display: flex;
-  flex-direction: row;
+html, body, #root {
+  height: 100%;
+  margin: 0;
 }
 
-.App-header {
-  background-color: #282c34;
+.App {
+  height: 100%;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+}
+
+.charts-container {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .chart {
-  flex: 1;
-  min-width: 0; 
-  height: 100vh; 
-}
-
-.chart:first-child {
-  flex: 4;
-}
-
-.chart:last-child {
-  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0; 
 }

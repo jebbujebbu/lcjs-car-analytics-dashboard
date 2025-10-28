@@ -2,8 +2,9 @@ import { Themes, ParallelCoordinateChart, LUT, regularColorSteps } from "@lightn
 import { useEffect, useState, useContext, useId } from "react";
 import { LCContext } from "../LC";
 
-export default function ParallelChart() {
-//   const data = [];
+export default function ParallelChart(props) {
+  const data = props.data;
+  console.log("ParallelChart data:", props.data);
   const id = useId();
   const lc = useContext(LCContext);
   const [chartState, setChartState] = useState();
@@ -16,29 +17,53 @@ export default function ParallelChart() {
     const chart = lc.ParallelCoordinateChart({
       theme: Themes.darkGold,
       container,
-    }).setTitle('Parallel Coordinate Chart with Value based coloring');
+    }).setTitle('Parallel Coordinate Chart with Filters');
 
-    fetch('/assets/machine-learning-accuracy-data.json')
-    .then((r) => r.json())
-    .then((data) => {
-        const theme = chart.getTheme()
-        const Axes = {
-            batch_size: 0,
-            channels_one: 1,
-            learning_rate: 2,
-            accuracy: 3,
-        }
-        chart.setAxes(Axes)
-        chart.getAxis(Axes.accuracy).setInterval({ start: 0, end: 1 })
-        chart.setLUT({
-            axis: chart.getAxis(Axes.accuracy),
-            lut: new LUT({
-                interpolate: true,
-                steps: regularColorSteps(0, 1, theme.examples.badGoodColorPalette),
-            }),
-        })
-        data.forEach((sample) => chart.addSeries().setData(sample))
-    })
+    // Set chart data
+    const theme = chart.getTheme();
+    const Axes = {
+      Price: 0,
+      Horsepower: 1,
+      Weight: 2,
+      FuelEfficiency: 3,
+    };
+    chart.setAxes(Axes);
+    chart.getAxis(Axes.FuelEfficiency).setInterval({ start: 5, end: 35 });
+    chart.setLUT({
+      axis: chart.getAxis(Axes.FuelEfficiency),
+      lut: new LUT({
+        interpolate: true,
+        steps: regularColorSteps(5, 35, theme.examples.badGoodColorPalette),
+      }),
+    });
+    // Add predefined range selector to Fuel Efficiency axis
+    chart.getAxis(Axes.FuelEfficiency).addRangeSelector().setInterval(30, 35);
+
+    data.forEach((sample) => chart.addSeries().setName(`${sample.Manufacturer} ${sample.Model}`).setData(sample));
+
+    // fetch('/assets/cars.json')
+    // .then((r) => r.json())
+    // .then((data) => {
+    //     const theme = chart.getTheme()
+    //     const Axes = {
+    //         Price: 0,
+    //         Horsepower: 1,
+    //         Weight: 2,
+    //         FuelEfficiency: 3,
+    //     }
+    //     chart.setAxes(Axes)
+    //     chart.getAxis(Axes.FuelEfficiency).setInterval({ start: 5, end: 35 })
+    //     chart.setLUT({
+    //         axis: chart.getAxis(Axes.FuelEfficiency),
+    //         lut: new LUT({
+    //             interpolate: true,
+    //             steps: regularColorSteps(5, 35, theme.examples.badGoodColorPalette),
+    //         }),
+    //     })
+    //     // Add predefined range selector to Fuel Efficiency axis
+    //     chart.getAxis(Axes.FuelEfficiency).addRangeSelector().setInterval(30, 35)
+    //     data.forEach((sample) => chart.addSeries().setData(sample))
+    // })
 
     // const lineSeries = chart.addLineSeries({
     //   schema: {
@@ -56,8 +81,8 @@ export default function ParallelChart() {
     if (!chartState || chartState.chart.isDisposed()) {
       return;
     }
-    // chartState.chart.setSamples({ y: data });
-  }, [chartState]);
+    chartState.chart.setSamples({ y: data });
+  }, [chartState, data]);
 
   return <div id={id} className="chart"></div>;
 }
