@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import './App.css';
 import { LCHost } from './LC';
-import Charts from './charts';
+import Charts from './Charts';
+import ParallelChart from './Components/ParallelChart';
 // import ParallelChart from './Components/ParallelChart';
 // import BarChart  from './Components/BarChart';
 // import HistogramChart  from './Components/HistogramChart';

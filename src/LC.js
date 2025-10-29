@@ -2,7 +2,6 @@
 // between any LCJS based components that can be visible at the same time
 // In simple use cases with 1-2 charts visible at once, there is no need to use these.
 // However, with more charts visible at once, this gives an incredible performance advantage, since all charts use a shared LC context.
-// See usage example in ./Components/MyChartComponent.js and ./App.js
 
 import { createContext, useEffect, useRef, useState } from "react";
 import { lightningChart } from "@lightningchart/lcjs";
@@ -27,6 +26,7 @@ export function LCHost(props) {
           sharedContextOptions: {
             useIndividualCanvas: true,
           },
+          resourcesBaseUrl: 'http://127.0.0.1:8080',
         });
         setLcState(lcRef.current);
       } catch (e) {

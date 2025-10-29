@@ -1,268 +1,299 @@
-import { Themes, LUT, regularColorSteps, BarChartTypes, AxisTickStrategies, FormattingFunctions } from "@lightningchart/lcjs";
-import { useEffect, useContext, useId } from "react";
-import { LCContext } from "./LC";
+import { Themes, LUT, regularColorSteps, BarChartTypes, SolidFill, ColorHEX } from "@lightningchart/lcjs"
+import { useEffect, useContext, useId } from "react"
+import { LCContext } from "./LC"
+
 
 // Charts:
-// Bar chart: “Which manufacturer and fuel type are the selected cars?”
-// Histogram: “How expensive are the selected cars?”
-// Scatter: “Is there a correlation between horsepower and price?”
+// Parallel Coordinates: “What are the characteristics of the selected cars?”
+// Horizontal Bar Chart: “How many models does each manufacturer have, broken down by fuel type?”
+// Vertical Bar Chart: “What is the average price per fuel type?”
+// Scatter Chart: “What is the relationship between weight and fuel efficiency?”
+// Histogram: “What is the distribution of car prices?”
 
 
-// TODO: fetch in here OR in App.js and pass data as prop?
-// TODO: histogram doesn't show data
-// TODO: weight
-// TODO: Use the same colorKey across charts (Fuel or Manufacturer) for visual linking and add a toggle to switch.
-// TODO: Keep bin boundaries stable (use globalPriceRange) so user comparisons across selections are valid.
+// TODO: Scatter Chart & Histogram: no updating in x-axis min and max on new data
+// TODO: Scatter Chart: remove cursor text box
+// TODO: Fuel types should be in the same order on all charts
+// TODO: Remove decimals from chart labels
 // TODO: Link charts with brushing/selection: selecting points on scatter highlights lines in parallel coords and updates histogram.
 // TODO: For skewed prices, consider log scale or show both linear + log toggle.
 // TODO: Show sample size on every chart; for small selections (<5) prefer list/detail view over distributions.
 // TODO: IE version (no LCContext, data fetching in Charts)
 
 
+
 export default function Charts() {
-  console.log("Charts component rendered");
-  const idParallel = useId();
-  const idBar = useId();
-  const idHistogram = useId();
-  const lc = useContext(LCContext);
+  const idParallel = useId()
+  const idBar = useId()
+  const idFuelPrice = useId()
+  const idScatterWE = useId()
+  const idHistogram = useId()
+  const lc = useContext(LCContext)
 
   useEffect(() => {
-    const pContainer = document.getElementById(idParallel);
-    const bContainer = document.getElementById(idBar);
-    const hContainer = document.getElementById(idHistogram);
+    const pContainer = document.getElementById(idParallel)
+    const bContainer = document.getElementById(idBar)
+    const fContainer = document.getElementById(idFuelPrice)
+    const weContainer = document.getElementById(idScatterWE)
+    const hContainer = document.getElementById(idHistogram)
+    if (!pContainer || !bContainer || !fContainer || !weContainer || !hContainer || !lc) return
 
-    if (!pContainer || !bContainer || !hContainer || !lc) return;
+    const safeUpdate = (name, fn) => {
+      try {
+        fn()
+      } catch (e) {
+        console.error(`[Updater "${name}" failed]`, e)
+      }
+    }
 
-    // Parallel Coordinate Chart
+    // Shared color palette for all non-parallel charts
+    const fuelPalette = {
+      Petrol: ColorHEX('#C66BAA'),  
+      Diesel: ColorHEX('#4EA3FF'),  
+      Electric: ColorHEX('#B58BFF'), 
+      Hybrid: ColorHEX('#38C6A6'),  
+      default: ColorHEX('#f0e29eff'),  
+    }
+
+    // Parallel Coordinates
     const pChart = lc
       .ParallelCoordinateChart({ theme: Themes.darkGold, container: pContainer })
-      .setTitle("Parallel Coordinates with Filters");
+      .setTitle("Car Characteristics Parallel Coordinates - Double click on axis to filter")
 
-    // Bar Chart
+    // Horizontal Bar Chart
     const bChart = lc.BarChart({
       theme: Themes.darkGold,
       container: bContainer,
       legend: { addEntriesAutomatically: false },
       type: BarChartTypes.Horizontal,
-    });
-    bChart.setTitle("By Manufacturer (split by Fuel type)").setValueLabels(undefined)
+    }).setTitle("Models by Manufacturer (stacked by Fuel)")
+      .setValueLabels(undefined)
+      .setCornerRadius(undefined) 
 
-    // Histogram Chart
-    const hChart = lc
-      .ChartXY({ theme: Themes.darkGold, container: hContainer })
-      .setTitle("Price histogram")
-      .setCursorMode('show-pointed')
-      .setUserInteractions({
-        rectangleZoom: {
-            y: false,
-        },
-        zoom: {
-            y: false,
-        },
+    // Vertical Bar Chart
+    const fChart = lc.BarChart({
+      theme: Themes.darkGold,
+      container: fContainer,
+      legend: { addEntriesAutomatically: false },
+      type: BarChartTypes.Vertical,
+    }).setTitle("Average Price per Fuel ($k)")
+      .setValueLabels((info) => {
+        const v = typeof info === "number" ? info : info?.value
+        return `$${Number(v || 0).toFixed(0)}k`
       })
 
-    // Configure axes 
-    let bins = [];
-    hChart.axisX.setTitle('Price')
-    hChart.axisY.setTitle('Count')
-    hChart.axisX.setTickStrategy(AxisTickStrategies.Numeric, (strategy) =>
-        strategy.setCursorFormatter((x) => {
-            const bin = bins.find((bin) => x >= bin.binStart && x <= bin.binEnd)
-            if (!bin) return ''
-            return `[${FormattingFunctions.Numeric(bin.binStart, hChart.axisX.getInterval())}, ${FormattingFunctions.Numeric(
-                bin.binEnd,
-                hChart.axisX.getInterval(),
-            )}]`
-        }),
-    )
-    const barFillStyle = (() => {
-        const v = hChart.getTheme().pointSeriesFillStyle
-        return typeof v === 'function' ? v(0) : v
-    })()
-    const barStroke = hChart.getTheme().dataGridBorderStrokeStyle
+    // Scatter Chart
+    const weChart = lc.ChartXY({ theme: Themes.darkGold, container: weContainer })
+      .setTitle("Weight vs Fuel Efficiency")
+    const axisX_WE = weChart.getDefaultAxisX().setTitle("Weight (kg)")
+    const axisY_WE = weChart.getDefaultAxisY().setTitle("Fuel Efficiency (mpg)")
 
-    // ...
-
-    const rectSeries = hChart
-        .addRectangleSeries({})
-        .setName('Histogram series')
-        .setDefaultStyle((figure) => figure.setFillStyle(barFillStyle).setStrokeStyle(barStroke))
-    
-    // Summary & histogram computation
-    function summaryStats(values) {
-      if (!values || values.length === 0) return { count: 0, mean: 0, median: 0, min: 0, max: 0 };
-      const sorted = [...values].sort((a, b) => a - b);
-      const count = sorted.length;
-      const mean = sorted.reduce((s, v) => s + v, 0) / count;
-      const median = count % 2 === 1 ? sorted[(count - 1) / 2] : (sorted[count / 2 - 1] + sorted[count / 2]) / 2;
-      const min = sorted[0];
-      const max = sorted[count - 1];
-      return { count, mean, median, min, max };
+    const scatterByFuel = {}
+    const getScatterForFuel = (fuel) => {
+      if (scatterByFuel[fuel]) return scatterByFuel[fuel]
+      const s = weChart.addPointSeries({ pointShape: "Circle" }).setPointSize(7).setName(fuel)
+      s.setPointFillStyle(new SolidFill({ color: fuelPalette[fuel] || fuelPalette.default }))
+      scatterByFuel[fuel] = s
+      return s
     }
 
-    function computeHistogram(values, binCount = 12, fixedRange = null) {
-      if (!values || values.length === 0) {
-        return { centers: [], counts: [], labels: [], min: 0, max: 0, binWidth: 0 };
-      }
-      const min = fixedRange ? fixedRange.min : Math.min(...values);
-      const max = fixedRange ? fixedRange.max : Math.max(...values);
-      const range = max - min || 1;
-      const binWidth = range / binCount;
-      const counts = new Array(binCount).fill(0);
+    // Histogram
+    const hBar = lc.BarChart({
+      theme: Themes.darkGold,
+      container: hContainer,
+      legend: { addEntriesAutomatically: false },
+      type: BarChartTypes.Vertical,
+    }).setTitle("Price Distribution")
+      .setValueLabels(undefined)
+      .setCornerRadius(undefined) 
 
-      values.forEach((v) => {
-        const clamped = Math.max(min, Math.min(max, v));
-        let idx = Math.floor((clamped - min) / binWidth);
-        if (idx >= binCount) idx = binCount - 1;
-        counts[idx]++;
-      });
+    let globalBins = null
+    let disposed = false
 
-      const centers = Array.from({ length: binCount }, (_, i) => min + (i + 0.5) * binWidth);
-      const labels = centers.map((c, i) => {
-        const start = Math.round(min + i * binWidth);
-        const end = Math.round(min + (i + 1) * binWidth);
-        return `$${start}–${end}`;
-      });
-
-      return { centers, counts, labels, min, max, binWidth };
-    }
-
-    let globalPriceRange = null;
-
-    function updateHistogramFromSamples(samples, binCount = 12) {
-      if (!hChart || hChart.isDisposed()) return;
-
-      if (!samples || samples.length === 0) {
-        hChart.setTitle("Price histogram — no selection");
-        if (rectSeries && typeof rectSeries.clear === "function") rectSeries.clear();
-        return;
-      }
-
-      const prices = samples.map((s) => s.Price).filter((v) => typeof v === "number" && !Number.isNaN(v));
-      const stats = summaryStats(prices);
-      const histogram = computeHistogram(prices, binCount, globalPriceRange || null);
-
-      hChart.setTitle(
-        `Price distribution — ${stats.count} items • mean $${Math.round(stats.mean)} • median $${Math.round(stats.median)}`
-      );
-
-      // Build rectangle points: { x0, x1, y0, y1 } for each bin
-      const half = histogram.binWidth / 2;
-      const rects = histogram.centers.map((center, i) => ({
-        x0: center - half,
-        x1: center + half,
-        y0: 0,
-        y1: histogram.counts[i],
-      }));
- 
-      hChart.axisX.setInterval({ start: histogram.min - half, end: histogram.max + half });
-      hChart.axisY.setInterval({ start: 0, end: Math.max(...histogram.counts) * 1.2 });
-
-      // Set rectangle data
-      try {
-        if (typeof rectSeries.setData === "function") {
-          rectSeries.setData(rects);
-        } else if (typeof rectSeries.replace === "function") {
-          rectSeries.replace(rects);
-        } else if (typeof rectSeries.clear === "function" && typeof rectSeries.add === "function") {
-          rectSeries.clear();
-          rects.forEach((r) => rectSeries.add(r));
-        } else {
-          console.warn("RectangleSeries API not recognized; inspect rectangleSeries methods:", Object.keys(rectSeries));
-        }
-      } catch (e) {
-        console.warn("Failed to set rectangle series data", e);
-      }
-    }
-    // ...
-
-
-    let disposed = false;
-
+    // Data fetch
     fetch("/assets/cars.json")
       .then((r) => r.json())
       .then((data) => {
-        if (disposed) return;
-        const theme = pChart.getTheme();
-        const Axes = {
-          Price: 0,
-          Horsepower: 1,
-          Weight: 2,
-          FuelEfficiency: 3,
-        };
-        pChart.setAxes(Axes);
+        if (disposed) return
 
-        pChart.getAxis(Axes.FuelEfficiency).setInterval({ start: 5, end: 35 });
+        // Parallel Coordinates setup
+        const theme = pChart.getTheme()
+        const Axes = { Price: 0, Horsepower: 1, Weight: 2, FuelEfficiency: 3 }
+        pChart.setAxes(Axes)
         pChart.setLUT({
           axis: pChart.getAxis(Axes.FuelEfficiency),
           lut: new LUT({
             interpolate: true,
             steps: regularColorSteps(5, 35, theme.examples.badGoodColorPalette),
           }),
-        });
+        })
+        pChart.getAxis(Axes.FuelEfficiency).addRangeSelector().setInterval(25, 35)
 
-  // Add a predefined range selector on FuelEfficiency
-  pChart.getAxis(Axes.FuelEfficiency).addRangeSelector().setInterval(25, 35);
+        data.forEach((sample) =>
+          pChart.addSeries().setName(`${sample.Manufacturer} ${sample.Model}`).setData(sample)
+        )
 
-        // Add series (one series per sample)
-        data.forEach((sample) => pChart.addSeries().setName(`${sample.Manufacturer} ${sample.Model}`).setData(sample));
+        // Build stable histogram bins
+        const allPrices = data.map((d) => Number(d.Price)).filter(Number.isFinite)
+        const minP = Math.min(...allPrices)
+        const maxP = Math.max(...allPrices)
+        const binCount = 12
+        const step = (maxP - minP) / binCount
+        const boundaries = Array.from({ length: binCount + 1 }, (_, i) => minP + i * step)
+        const labels = Array.from({ length: binCount }, (_, i) =>
+          `$${Math.round(boundaries[i])}–${Math.round(boundaries[i + 1])}k`
+        )
+        globalBins = { labels, boundaries }
 
-        // Update bar chart from selected samples
+        // Updaters
         function updateBarChartFromSamples(samples) {
-          if (!bChart || bChart.isDisposed()) return;
-          if (!samples || samples.length === 0) {
-            bChart.setDataGrouped(["No selection"], [{ subCategory: "Count", values: [0] }]);
-            return;
+          if (!bChart || bChart.isDisposed()) return
+          if (!samples?.length) {
+            bChart.setDataGrouped(["No selection"], [{ subCategory: "Count", values: [0] }])
+            return
           }
 
-          const manufacturers = Array.from(new Set(samples.map((s) => s.Manufacturer)));
-          const fuels = Array.from(new Set(samples.map((s) => s.Fuel)));
-
-          // For each fuel, compute counts per manufacturer
+          const manufacturers = [...new Set(samples.map((s) => s.Manufacturer))]
+          const fuels = [...new Set(samples.map((s) => s.Fuel))]
           const valuesByFuel = fuels.map((fuel) =>
-            manufacturers.map((m) => samples.filter((s) => s.Manufacturer === m && s.Fuel === fuel).length),
-          );
+            manufacturers.map((m) => samples.filter((s) => s.Manufacturer === m && s.Fuel === fuel).length)
+          )
 
-          // ...
+          const stacked = fuels.map((fuel, i) => ({
+            subCategory: fuel,
+            values: valuesByFuel[i],
+          }))
+          bChart.setDataStacked(manufacturers, stacked)
 
-          // After loading data and computing initial selection:
-          globalPriceRange = { min: Math.min(...data.map(d => d.Price)), max: Math.max(...data.map(d => d.Price)) };
-          updateHistogramFromSamples(initialSelected);
-
-          // ...
-
-          const stacked = fuels.map((fuel, i) => ({ subCategory: fuel, values: valuesByFuel[i] }));
-          bChart.setDataStacked(manufacturers, stacked);
+          // Apply colors to each fuel sub-bar
+          manufacturers.forEach((m) => {
+            fuels.forEach((fuel) => {
+              const bar = bChart.getBar(m, fuel)
+              if (bar) bar.setFillStyle(new SolidFill({ color: fuelPalette[fuel] || fuelPalette.default }))
+            })
+          })
         }
 
-        // Initial bar chart based on preset selector interval
-        const [start, end] = [30, 35];
-        const initialSelected = data.filter((d) => d.FuelEfficiency >= start && d.FuelEfficiency <= end);
-        updateBarChartFromSamples(initialSelected);
+        function updateFuelPriceChart(samples) {
+          if (!fChart || fChart.isDisposed()) return
+          if (!samples?.length) {
+            fChart.setDataGrouped(["No selection"], [{ subCategory: "Average Price", values: [0] }])
+            return
+          }
 
-        // React to selection changes (range selectors)
+          const fuels = [...new Set(samples.map((s) => s.Fuel))]
+          const averages = fuels.map((fuel) => {
+            const subset = samples.filter((s) => s.Fuel === fuel)
+            return subset.reduce((sum, s) => sum + Number(s.Price || 0), 0) / Math.max(1, subset.length)
+          })
+
+          fChart.setDataGrouped(fuels, [{ subCategory: "Avg Price", values: averages }])
+
+          // Color each bar by fuel type
+          fuels.forEach((fuel) => {
+            const bar = fChart.getBar(fuel, "Avg Price")
+            if (bar) bar.setFillStyle(new SolidFill({ color: fuelPalette[fuel] || fuelPalette.default }))
+          })
+        }
+
+        function updateScatterWE(samples) {
+          Object.values(scatterByFuel).forEach((s) => s.clear())
+          if (!samples?.length) return
+
+          const byFuel = samples.reduce((acc, s) => {
+            const f = s.Fuel || "Unknown"
+            ;(acc[f] ||= { x: [], y: [] })
+            const x = Number(s.Weight)
+            const y = Number(s.FuelEfficiency)
+            if (Number.isFinite(x) && Number.isFinite(y)) {
+              acc[f].x.push(x)
+              acc[f].y.push(y)
+            }
+            return acc
+          }, {})
+
+          Object.entries(byFuel).forEach(([fuel, { x, y }]) => {
+            if (x.length) getScatterForFuel(fuel).appendSamples({ xValues: x, yValues: y })
+          })
+
+          const allX = samples.map((s) => Number(s.Weight)).filter(Number.isFinite)
+          const allY = samples.map((s) => Number(s.FuelEfficiency)).filter(Number.isFinite)
+          if (allX.length && allY.length) {
+            axisX_WE.setInterval({ start: Math.min(...allX), end: Math.max(...allX) })
+            axisY_WE.setInterval({ start: Math.min(...allY), end: Math.max(...allY) })
+          }
+        }
+
+        function updateHistogram(samples) {
+          if (!hBar || hBar.isDisposed() || !globalBins) return
+          const { labels, boundaries } = globalBins
+          const counts = Array(boundaries.length - 1).fill(0)
+          samples.forEach((s) => {
+            const v = Number(s.Price)
+            for (let i = 0; i < boundaries.length - 1; i++) {
+              if (v >= boundaries[i] && v < boundaries[i + 1]) {
+                counts[i]++
+                break
+              }
+            }
+          })
+          hBar.setDataGrouped(labels, [{ subCategory: "Count", values: counts }])
+
+          // Set histogram color
+          labels.forEach((label) => {
+            const bar = hBar.getBar(label, "Count")
+            if (bar) bar.setFillStyle(new SolidFill({ color: fuelPalette.default }))
+          })
+        }
+
+        // Initial selection
+        const [rsStart, rsEnd] = [30, 35]
+        const initialSelected = data.filter(
+          (d) => d.FuelEfficiency >= rsStart && d.FuelEfficiency <= rsEnd
+        )
+
+        safeUpdate("bar", () => updateBarChartFromSamples(initialSelected))
+        safeUpdate("fuelPrice", () => updateFuelPriceChart(initialSelected))
+        safeUpdate("scatterWE", () => updateScatterWE(initialSelected))
+        safeUpdate("histogram", () => updateHistogram(initialSelected))
+
+        // Parallel Coordinates selection handling
         pChart.addEventListener("seriesselect", (event) => {
-          const selectedSeries = event.selectedSeries || [];
-          const selectedSamples = selectedSeries.map((s) => s.getData());
-          updateBarChartFromSamples(selectedSamples);
-          updateHistogramFromSamples(selectedSamples);
-        });
+          const selectedSeries = event.selectedSeries || []
+          const selectedSamples = selectedSeries.map((s) => s.getData())
+          safeUpdate("bar", () => updateBarChartFromSamples(selectedSamples))
+          safeUpdate("fuelPrice", () => updateFuelPriceChart(selectedSamples))
+          safeUpdate("scatterWE", () => updateScatterWE(selectedSamples))
+          safeUpdate("histogram", () => updateHistogram(selectedSamples))
+        })
       })
-      .catch((e) => console.error("Failed to load cars.json", e));
+      .catch((e) => console.error("Failed to load cars.json", e))
 
     return () => {
-      disposed = true;
-      try { pChart.dispose(); } catch (e) {}
-      try { bChart.dispose(); } catch (e) {}
-      try { hChart.dispose(); } catch (e) {}
-    };
-  }, [idParallel, idBar, idHistogram, lc]);
+      disposed = true
+      try { pChart.dispose() } catch {}
+      try { bChart.dispose() } catch {}
+      try { fChart.dispose() } catch {}
+      try { weChart.dispose() } catch {}
+      try { hBar.dispose() } catch {}
+    }
+  }, [idParallel, idBar, idFuelPrice, idScatterWE, idHistogram, lc])
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gridTemplateRows: "1fr 1fr", width: "100%", height: "100%" }}>
-      <div id={idParallel} className="chart" style={{ gridColumn: "1 / 2", gridRow: "1 / 3" }}></div>
-      <div id={idBar} className="chart" style={{ gridColumn: "2 / 3", gridRow: "1 / 2" }}></div>
-      <div id={idHistogram} className="chart" style={{ gridColumn: "2 / 3", gridRow: "2 / 3" }}></div>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr 1fr 1fr",
+        gridTemplateRows: "2fr 1fr",
+        width: "100%",
+        height: "100%",
+      }}
+    >
+      <div id={idParallel} style={{ gridRow: "1", gridColumn: "span 4" }} />
+      <div id={idBar} style={{ gridRow: "2", gridColumn: "1" }} />
+      <div id={idFuelPrice} style={{ gridRow: "2", gridColumn: "2" }} />
+      <div id={idScatterWE} style={{ gridRow: "2", gridColumn: "3" }} />
+      <div id={idHistogram} style={{ gridRow: "2", gridColumn: "4" }} />
     </div>
-  );
+  )
 }
