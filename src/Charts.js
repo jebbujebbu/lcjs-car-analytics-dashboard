@@ -1,4 +1,4 @@
-import { Themes, LUT, regularColorSteps, BarChartTypes, SolidFill, ColorHEX, AxisTickStrategies, htmlTextRenderer, SolidLine, emptyLine } from "@lightningchart/lcjs"
+import { Themes, LUT, regularColorSteps, BarChartTypes, SolidFill, ColorHEX, AxisTickStrategies, AxisScrollStrategies, htmlTextRenderer, SolidLine, emptyLine } from "@lightningchart/lcjs"
 import { useEffect, useContext, useId } from "react"
 import { LCContext } from "./LC"
 
@@ -78,7 +78,7 @@ export default function Charts() {
       .setTitle("Models by Manufacturer")
       .setValueLabels(undefined)
       .setCornerRadius(undefined) 
-      .setPadding({ left: 10, right: 20, top: 0, bottom: 10 })
+      .setPadding({ left: 20, right: 20, top: 0, bottom: 10 })
 
       modelsChart.valueAxis.setTickStrategy(AxisTickStrategies.Numeric, ticks => ticks
         .setMajorFormattingFunction((value) => `${value.toFixed(1)}`)
