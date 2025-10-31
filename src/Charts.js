@@ -1,4 +1,4 @@
-import { Themes, LUT, regularColorSteps, BarChartTypes, SolidFill, ColorHEX, AxisTickStrategies, AxisScrollStrategies, htmlTextRenderer, SolidLine, emptyLine } from "@lightningchart/lcjs"
+import { Themes, LUT, regularColorSteps, BarChartTypes, SolidFill, ColorHEX, AxisTickStrategies, htmlTextRenderer, SolidLine, emptyLine } from "@lightningchart/lcjs"
 import { useEffect, useContext, useId } from "react"
 import { LCContext } from "./LC"
 
@@ -161,7 +161,7 @@ export default function Charts() {
       .getDefaultAxisY()
       .setTitle("Horsepower (hp)")
       .setScrollStrategy(undefined)
-      .setInterval({ start: 0, end: 500, stopAxisAfter: false })
+      .setInterval({ start: 70, end: 700, stopAxisAfter: false })
 
       // Get or create box and point series per fuel type
       const boxByFuel = {}
@@ -373,7 +373,7 @@ export default function Charts() {
 
           // Adjust Y range dynamically
           hpAxisY.setInterval({
-            start: 0,
+            start: Math.min(...allHP) * 0.7,
             end: Math.max(...allHP) * 1.1,
             stopAxisAfter: false,
           })
