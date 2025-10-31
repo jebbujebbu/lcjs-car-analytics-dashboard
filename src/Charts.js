@@ -35,7 +35,7 @@ export default function Charts() {
     }
 
     // Initial range selector values
-    const [rsStart, rsEnd] = [25, 35]
+    const [rsStart, rsEnd] = [20, 35]
     
     // Parallel coordinate chart - car characteristics
     const parallelChart = lc
