@@ -1,4 +1,4 @@
-import { Themes, LUT, regularColorSteps, BarChartTypes, SolidFill, ColorHEX, PieChartTypes, SliceLabelFormatters, htmlTextRenderer } from "@lightningchart/lcjs"
+import { Themes, LUT, regularColorSteps, BarChartTypes, SolidFill, ColorHEX, AxisTickStrategies, htmlTextRenderer, SolidLine, emptyLine } from "@lightningchart/lcjs"
 import { useEffect, useContext, useId } from "react"
 import { LCContext } from "./LC"
 
@@ -8,21 +8,14 @@ import { LCContext } from "./LC"
 // Horizontal Bar Chart: “How many models does each manufacturer have, broken down by fuel type?”
 // Vertical Bar Chart: “What is the average price per fuel type?”
 // Scatter Chart: “What is the relationship between weight and fuel efficiency?”
-// Pie Chart: "What price range categories do the cars fall into?"
-
-
-// TODO: PieChart: korjaa labelit + rajaus pois legendistä
-// TODO: Remove decimals from chart labels
-// TODO: IE version (no LCContext, data fetching in Charts)
-
-
+// Box and Whiskers Chart: “What is the distribution of horsepower per fuel type?”
 
 export default function Charts() {
   const idParallel = useId()
   const idModels = useId()
   const idFuelPrice = useId()
   const idWeightFE = useId()
-  const idRange = useId()
+  const idHorsepower = useId()
   const lc = useContext(LCContext)
 
   useEffect(() => {
@@ -30,18 +23,10 @@ export default function Charts() {
     const mContainer = document.getElementById(idModels)
     const fContainer = document.getElementById(idFuelPrice)
     const wfContainer = document.getElementById(idWeightFE)
-    const rContainer = document.getElementById(idRange)
-    if (!pContainer || !mContainer || !fContainer || !wfContainer || !rContainer || !lc) return
+    const hContainer = document.getElementById(idHorsepower)
+    if (!pContainer || !mContainer || !fContainer || !wfContainer || !hContainer || !lc) return
 
-    const safeUpdate = (name, fn) => {
-      try {
-        fn()
-      } catch (e) {
-        console.error(`[Updater "${name}" failed]`, e)
-      }
-    }
-
-    // Shared color palette for all non-parallel charts
+    // Color palette for bottom row charts
     const fuelPalette = {
       Petrol: ColorHEX('#C66BAA'),  
       Diesel: ColorHEX('#4EA3FF'),  
@@ -50,23 +35,10 @@ export default function Charts() {
       default: ColorHEX('#f0e29eff'),  
     }
 
-    // Power-to-Weight Ratio Categories (Horsepower per metric ton)
-    const priceRanges = [
-      { label: '<120 HP/t', min: 0, max: 120 },
-      { label: '120–160 HP/t', min: 120, max: 160 },
-      { label: '160–200 HP/t', min: 160, max: 200 },
-      { label: '>200 HP/t', min: 200, max: Infinity },
-    ]
-
-    // Price Range Colors for Pie Chart
-    const rangePalette = {
-      Low: ColorHEX('#E6C4C0'),  
-      Medium: ColorHEX('#B6C7B2'),  
-      High: ColorHEX('#CBBBE2'), 
-      VeryHigh: ColorHEX('#A4C7C4'),  
-    }
-
-    // Parallel Coordinate Chart - Car Characteristics
+    // Initial range selector values
+    const [rsStart, rsEnd] = [25, 35]
+    
+    // Parallel coordinate chart - car characteristics
     const parallelChart = lc
       .ParallelCoordinateChart({ 
         theme: Themes.darkGold, 
@@ -74,8 +46,28 @@ export default function Charts() {
         textRenderer: htmlTextRenderer, 
       })
       .setTitle("Car Characteristics - Double Click on Axis to Filter")
+      .setPadding({ left: 20, right: 30, top: 0, bottom: 10 })
 
-    // Horizontal Bar Chart - Models by Manufacturer
+      const theme = parallelChart.getTheme()
+      const Axes = { 
+        Price: 0, 
+        Horsepower: 1,
+        Weight: 2, 
+        FuelEfficiency: 3 
+      }
+      parallelChart
+        .setAxes(Axes)
+        .setLUT({
+          axis: parallelChart.getAxis(Axes.FuelEfficiency),
+          lut: new LUT({
+            interpolate: true,
+            steps: regularColorSteps(5, 35, theme.examples.badGoodColorPalette),
+          }),
+        })
+      // Initial range selector
+      parallelChart.getAxis(Axes.FuelEfficiency).addRangeSelector().setInterval(rsStart, rsEnd)
+
+    // Horizontal bar chart - models by manufacturer
     const modelsChart = lc
       .BarChart({
         theme: Themes.darkGold,
@@ -87,9 +79,13 @@ export default function Charts() {
       .setTitle("Models by Manufacturer")
       .setValueLabels(undefined)
       .setCornerRadius(undefined) 
-      .setPadding({ left: 20, right: 30, top: 0, bottom: 10 })
+      .setPadding({ left: 10, right: 20, top: 0, bottom: 10 })
 
-    // Vertical Bar Chart - Average Price per Fuel Type
+      modelsChart.valueAxis.setTickStrategy(AxisTickStrategies.Numeric, ticks => ticks
+        .setMajorFormattingFunction((value) => `${value.toFixed(1)}`)
+      )
+
+    // Vertical bar chart - average price per fuel type
     const fuelPriceChart = lc
       .BarChart({
         theme: Themes.darkGold,
@@ -103,47 +99,110 @@ export default function Charts() {
         formatter: (info) => `$${(info.value).toFixed(0)}k`,
       })
       .setPadding({ left: 10, right: 10, top: 0, bottom: 10 })
+      .setTitleMargin({ bottom: 20 })
+      fuelPriceChart.valueAxis.setTickStrategy(AxisTickStrategies.Numeric, ticks => ticks
+        .setMajorFormattingFunction((value) => `${value.toFixed(0)}`)
+      )
 
-    // Scatter Chart - Weight vs Fuel Efficiency
+    // Scatter chart - weight vs fuel efficiency
     const weightFEChart = lc
       .ChartXY({ 
         theme: Themes.darkGold, 
         container: wfContainer, 
+        // schema: {
+        //     x: { storage: Float64Array },
+        //     y: { storage: Float64Array }
+        // },
         textRenderer: htmlTextRenderer, 
       })
       .setTitle("Weight vs Fuel Efficiency")
       .setCursorMode('show-nearest')
       .setPadding({ left: 10, right: 10, top: 10, bottom: 10 })
 
-    const axisX_WE = weightFEChart.getDefaultAxisX().setTitle("Weight (kg)")
-    const axisY_WE = weightFEChart.getDefaultAxisY().setTitle("Fuel Efficiency (km/L)")
+      const wAxisX = weightFEChart.getDefaultAxisX().setTitle("Weight (kg)")
+      const wAxisY = weightFEChart.getDefaultAxisY().setTitle("Fuel Efficiency (km/L)")
+      wAxisY.setTickStrategy(AxisTickStrategies.Numeric, ticks => ticks
+        .setMajorFormattingFunction((value) => `${value.toFixed(0)}`)
+      )
+    
+      // Get or create series per fuel type
+      const scatterByFuel = {}
 
-    const scatterByFuel = {}
-    const getScatterForFuel = (fuel) => {
-      if (scatterByFuel[fuel]) return scatterByFuel[fuel]
-      const series = weightFEChart.addPointSeries({ 
-        pointShape: "Circle" 
+      const getScatterForFuel = (fuel) => {
+        if (scatterByFuel[fuel]) return scatterByFuel[fuel]
+        const series = weightFEChart.addPointSeries({ 
+          pointShape: "Circle" 
+        })
+          .setPointSize(9)
+          .setName(fuel)
+        series.setPointFillStyle(new SolidFill({ color: fuelPalette[fuel] || fuelPalette.default }))
+        scatterByFuel[fuel] = series
+        return series
+      }
+
+    // Box and whiskers chart - horsepower distribution per fuel type
+    const horsepowerChart = lc
+      .ChartXY({
+        theme: Themes.darkGold,
+        container: hContainer,
+        textRenderer: htmlTextRenderer,
+        legend: { addEntriesAutomatically: false },
       })
-        .setPointSize(9)
-        .setName(fuel)
-      series.setPointFillStyle(new SolidFill({ color: fuelPalette[fuel] || fuelPalette.default }))
-      scatterByFuel[fuel] = series
-      return series
+      .setTitle("Horsepower Distribution per Fuel Type")
+      .setCursorMode(undefined)
+      .setPadding({ left: 10, right: 10, top: 10, bottom: 10 })
+
+    const hpAxisX = horsepowerChart
+      .getDefaultAxisX()
+      // .setTitle("Fuel Type")
+      .setTickStrategy(AxisTickStrategies.Empty)
+      .setTitlePosition("center")
+
+    const hpAxisY = horsepowerChart
+      .getDefaultAxisY()
+      .setTitle("Horsepower (hp)")
+      .setScrollStrategy(undefined)
+      .setInterval({ start: 0, end: 500, stopAxisAfter: false })
+
+      // Get or create box and point series per fuel type
+      const boxByFuel = {}
+      const pointsByFuel = {}
+      const hpTicksByFuel = {} 
+      const fuelsOrdered = ["Electric", "Petrol", "Hybrid", "Diesel"]
+
+      fuelsOrdered.forEach((fuel, i) => {
+        const tick = hpAxisX.addCustomTick()  
+        tick.setValue(i + 0.5) 
+        tick.setTextFormatter(() => fuel)
+        tick.setGridStrokeLength(0)
+        hpTicksByFuel[fuel] = tick  
+      })
+
+    function getBoxForFuel(fuel) {
+      if (boxByFuel[fuel]) return boxByFuel[fuel]
+
+      const boxSeries = horsepowerChart
+        .addBoxSeries()
+        .setDefaultStyle((figure) => figure
+          .setBodyWidth(0.8)
+          .setTailWidth(0.7)
+          .setBodyFillStyle(new SolidFill({ color: fuelPalette[fuel] || fuelPalette.default }))
+          .setStrokeStyle(new SolidLine({ thickness: 1, fillStyle: new SolidFill({ color: fuelPalette.default }) }))
+        )
+      boxByFuel[fuel] = boxSeries
+      return boxSeries
     }
 
-    // Pie Chart - Price Range Categories
-    const rangeChart = lc
-    .Pie({
-      theme: Themes.darkGold,
-      container: rContainer,
-      type: PieChartTypes.LabelsInsideSlices,
-      textRenderer: htmlTextRenderer,
-      // legend: { addEntriesAutomatically: false },
-      // legend: { visible: false },
-    })
-      .setTitle("Power-to-Weight Ratio Categories")
-      .setMultipleSliceExplosion(true)
-      .setPadding({ left: 20, right: 20, top: 0, bottom: 10 })
+    function getPointsForFuel(fuel) {
+      if (pointsByFuel[fuel]) return pointsByFuel[fuel]
+      const pointSeries = horsepowerChart
+        .addPointSeries({})
+        .setStrokeStyle(emptyLine)
+        .setPointSize(10)
+        .setPointFillStyle(new SolidFill({ color: fuelPalette[fuel] || fuelPalette.default }))
+      pointsByFuel[fuel] = pointSeries
+      return pointSeries
+    }
 
     let disposed = false
 
@@ -153,24 +212,7 @@ export default function Charts() {
       .then((data) => {
         if (disposed) return
 
-        // Parallel Coordinate Chart setup
-        const theme = parallelChart.getTheme()
-        const Axes = { 
-          Price: 0, 
-          Horsepower: 1,
-          Weight: 2, 
-          FuelEfficiency: 3 
-        }
-        parallelChart.setAxes(Axes)
-        parallelChart.setLUT({
-          axis: parallelChart.getAxis(Axes.FuelEfficiency),
-          lut: new LUT({
-            interpolate: true,
-            steps: regularColorSteps(5, 35, theme.examples.badGoodColorPalette),
-          }),
-        })
-        parallelChart.getAxis(Axes.FuelEfficiency).addRangeSelector().setInterval(25, 35)
-
+        // Update parallel chart 
         data.forEach((sample) =>
           parallelChart.addSeries().setName(`${sample.Manufacturer} ${sample.Model}`).setData(sample)
         )
@@ -183,12 +225,14 @@ export default function Charts() {
             return
           }
 
+          // Compute counts per manufacturer and fuel
           const manufacturers = [...new Set(samples.map((s) => s.Manufacturer))]
           const fuels = [...new Set(samples.map((s) => s.Fuel))]
           const valuesByFuel = fuels.map((fuel) =>
             manufacturers.map((m) => samples.filter((s) => s.Manufacturer === m && s.Fuel === fuel).length)
           )
 
+          // Set data
           const stacked = fuels.map((fuel, i) => ({
             subCategory: fuel,
             values: valuesByFuel[i],
@@ -212,12 +256,14 @@ export default function Charts() {
             return
           }
 
+          // Compute average price per fuel
           const fuels = [...new Set(samples.map((s) => s.Fuel))]
           const averages = fuels.map((fuel) => {
             const subset = samples.filter((s) => s.Fuel === fuel)
             return subset.reduce((sum, s) => sum + Number(s.Price || 0), 0) / Math.max(1, subset.length)
           })
 
+          // Set data
           fuelPriceChart.setDataGrouped(fuels, [{ subCategory: "Avg Price", values: averages }])
 
           // Color each bar by fuel type
@@ -232,6 +278,7 @@ export default function Charts() {
           Object.values(scatterByFuel).forEach((s) => s.clear())
           if (!samples?.length) return
 
+          // Group samples by fuel
           const byFuel = samples.reduce((acc, s) => {
             const f = s.Fuel || "Unknown"
             ;(acc[f] ||= { x: [], y: [] })
@@ -244,117 +291,143 @@ export default function Charts() {
             return acc
           }, {})
 
+          // Append samples per fuel
           Object.entries(byFuel).forEach(([fuel, { x, y }]) => {
-            if (x.length) getScatterForFuel(fuel).appendSamples({ xValues: x, yValues: y })
+            if (x.length) getScatterForFuel(fuel).appendSamples({ x: x, y: y })
+            // if (x.length) getScatterForFuel(fuel).appendSamples({
+            //   x: Float64Array.from(x),
+            //   y: Float64Array.from(y),
+            // })
           })
 
+          // Adjust axes ranges dynamically
           const allX = samples.map((s) => Number(s.Weight)).filter(Number.isFinite)
           const allY = samples.map((s) => Number(s.FuelEfficiency)).filter(Number.isFinite)
           if (allX.length && allY.length) {
-            axisX_WE.setInterval({ start: Math.min(...allX), end: Math.max(...allX) })
-            axisY_WE.setInterval({ start: Math.min(...allY), end: Math.max(...allY) })
+            wAxisX.setInterval({ start: Math.min(...allX), end: Math.max(...allX) })
+            wAxisY.setInterval({ start: Math.min(...allY), end: Math.max(...allY) })
           }
         }
 
-        // Update pie chart
-        function updatePriceRangeChart(samples) {
-          if (!rangeChart || rangeChart.isDisposed()) return
+        // Update box and whiskers chart
+        function updateHorsepowerChart(samples) {
+          if (!horsepowerChart || horsepowerChart.isDisposed()) return
           if (!samples?.length) {
-            rangeChart.setDataGrouped(["No selection"], [{ subCategory: "Count", values: [0] }])
+            Object.values(boxByFuel).forEach((s) => s.clear())
+            Object.values(pointsByFuel).forEach((s) => s.clear())
             return
           }
 
-          const slices = rangeChart.getSlices();
+          // Group horsepower per fuel
+          const byFuel = fuelsOrdered.reduce((acc, fuel) => {
+            acc[fuel] = samples
+              .filter((s) => s.Fuel === fuel)
+              .map((s) => Number(s.Horsepower))
+              .filter(Number.isFinite)
+              .sort((a, b) => a - b)
+            return acc
+          }, {})
 
-          // Count cars per power-to-weight ratio range
-          const counts = priceRanges.map((r) =>
-            samples.filter((s) => {
-              const hp = Number(s.Horsepower)
-              const w = Number(s.Weight)
-              if (!Number.isFinite(hp) || !Number.isFinite(w) || w <= 0) return false
-              const ratio = hp / (w / 1000) // HP per metric ton
-              return ratio >= r.min && ratio < r.max
-            }).length
-          )
+          const allHP = samples.map((s) => Number(s.Horsepower)).filter(Number.isFinite)
+          if (!allHP.length) return
 
-          Object.entries(counts).forEach(([i, count]) => {
-            const label = priceRanges[i].label
-            let slice = slices.find((s) => s.getName() === label)
-            if (!slice) {
-              slice = rangeChart.addSlice(label, count)
-            } else {
-              slice.setValue(count)
-            }
+          // Update series per fuel
+          fuelsOrdered.forEach((fuel, i) => {
+            const values = byFuel[fuel]
+            if (!values || values.length === 0) {
+                if (boxByFuel[fuel]) boxByFuel[fuel].clear()
+                if (pointsByFuel[fuel]) pointsByFuel[fuel].clear()
+                return
+              }
+            const box = getBoxForFuel(fuel)
+            const points = getPointsForFuel(fuel)
+
+            box.clear()
+            points.clear()
+
+            // Compute quartiles and whiskers
+            const q1 = values[Math.floor(0.25 * (values.length - 1))]
+            const median = values[Math.floor(0.5 * (values.length - 1))]
+            const q3 = values[Math.floor(0.75 * (values.length - 1))]
+            const iqr = q3 - q1
+            const lowerExtreme = Math.max(Math.min(...values), q1 - 1.5 * iqr)
+            const upperExtreme = Math.min(Math.max(...values), q3 + 1.5 * iqr)
+            const outliers = values.filter((v) => v < lowerExtreme || v > upperExtreme)
+
+            // Add box and whiskers data
+            const start = i
+            const end = i + 1
+            const middle = (start + end) / 2
+
+            box.add({
+              start,
+              end,
+              lowerExtreme,
+              lowerQuartile: q1,
+              median,
+              upperQuartile: q3,
+              upperExtreme,
+            })
+
+            outliers.forEach((o) => points.appendSample({ x: middle, y: o }))
           })
 
-          rangeChart.setSliceFillStyle((index) => {
-            const range = slices[index].getName()
-            switch (range) {
-              case '<120 HP/t':
-                return new SolidFill({ color: rangePalette.Low })
-              case '120–160 HP/t':
-                return new SolidFill({ color: rangePalette.Medium })
-              case '160–200 HP/t':
-                return new SolidFill({ color: rangePalette.High })
-              case '>200 HP/t':
-                return new SolidFill({ color: rangePalette.VeryHigh })
-              default:
-                return new SolidFill({ color: fuelPalette.default })
-            }
+          // Adjust Y range dynamically
+          hpAxisY.setInterval({
+            start: 0,
+            end: Math.max(...allHP) * 1.1,
+            stopAxisAfter: false,
           })
-
-          // rangeChart.setLabelFormatter(SliceLabelFormatters.NamePlusRelativeValue)
-          rangeChart.setLabelFormatter((slice, relativeValue) => slice.getName() + `: ${(relativeValue * 100).toFixed(1)}%`)
         }
 
         // Initial selection
-        const [rsStart, rsEnd] = [30, 35]
-        const initialSelected = data.filter(
-          (d) => d.FuelEfficiency >= rsStart && d.FuelEfficiency <= rsEnd
-        )
+        const initialSelected = data.filter((d) => d.FuelEfficiency >= rsStart && d.FuelEfficiency <= rsEnd)
+        updateModelsChart(initialSelected)
+        updateAvgPriceChart(initialSelected)
+        updateScatterChart(initialSelected)
+        updateHorsepowerChart(initialSelected)
 
-        safeUpdate("models", () => updateModelsChart(initialSelected))
-        safeUpdate("avgPrice", () => updateAvgPriceChart(initialSelected))
-        safeUpdate("scatter", () => updateScatterChart(initialSelected))
-        safeUpdate("pie", () => updatePriceRangeChart(initialSelected))
-
-        // Parallel Coordinates selection handling
+        // Range selector event
         parallelChart.addEventListener("seriesselect", (event) => {
           const selectedSeries = event.selectedSeries || []
           const selectedSamples = selectedSeries.map((s) => s.getData())
-          safeUpdate("models", () => updateModelsChart(selectedSamples))
-          safeUpdate("avgPrice", () => updateAvgPriceChart(selectedSamples))
-          safeUpdate("scatter", () => updateScatterChart(selectedSamples))
-          safeUpdate("pie", () => updatePriceRangeChart(selectedSamples))
+          updateModelsChart(selectedSamples)
+          updateAvgPriceChart(selectedSamples)
+          updateScatterChart(selectedSamples)
+          updateHorsepowerChart(selectedSamples)
         })
       })
       .catch((e) => console.error("Failed to load cars.json", e))
 
+    // Cleanup on unmount
     return () => {
       disposed = true
       try { parallelChart.dispose() } catch {}
       try { modelsChart.dispose() } catch {}
       try { fuelPriceChart.dispose() } catch {}
       try { weightFEChart.dispose() } catch {}
-      try { rangeChart.dispose() } catch {}
+      try { horsepowerChart.dispose() } catch {}
     }
-  }, [idParallel, idModels, idFuelPrice, idWeightFE, idRange, lc])
+  }, [idParallel, idModels, idFuelPrice, idWeightFE, idHorsepower, lc])
 
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1.5fr 1fr 1.5fr 1fr",
-        gridTemplateRows: "1.75fr 1fr",
-        width: "100%",
-        height: "100%",
-      }}
-    >
-      <div id={idParallel} style={{ gridRow: "1", gridColumn: "span 4" }} />
-      <div id={idModels} style={{ gridRow: "2", gridColumn: "1" }} />
-      <div id={idFuelPrice} style={{ gridRow: "2", gridColumn: "2" }} />
-      <div id={idWeightFE} style={{ gridRow: "2", gridColumn: "3" }} />
-      <div id={idRange} style={{ gridRow: "2", gridColumn: "4" }} />
+return (
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      width: "100%",
+      height: "100%",
+      gap: 0,
+    }}
+  >
+    <div id={idParallel} style={{ flex: "1.75"}} />
+    <div style={{ display: "flex", flex: "1", gap: 0 }}>  
+      <div id={idModels} style={{ flex: "1.5" }} />
+      <div id={idFuelPrice} style={{ flex: "1" }} />
+      <div id={idWeightFE} style={{ flex: "1.5" }} />
+      <div id={idHorsepower} style={{ flex: "1.5" }} />
     </div>
-  )
+  </div>
+)
+
 }
