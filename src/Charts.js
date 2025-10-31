@@ -2,7 +2,6 @@ import { Themes, LUT, regularColorSteps, BarChartTypes, SolidFill, ColorHEX, Axi
 import { useEffect, useContext, useId } from "react"
 import { LCContext } from "./LC"
 
-
 // Charts:
 // Parallel Coordinate Chart: “What are the characteristics of the selected cars?”
 // Horizontal Bar Chart: “How many models does each manufacturer have, broken down by fuel type?”
