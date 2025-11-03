@@ -1,4 +1,4 @@
-import { Themes, LUT, regularColorSteps, BarChartTypes, SolidFill, ColorHEX, AxisTickStrategies, htmlTextRenderer, SolidLine, emptyLine } from "@lightningchart/lcjs"
+import { Themes, LUT, regularColorSteps, BarChartTypes, SolidFill, ColorHEX, AxisTickStrategies, htmlTextRenderer, SolidLine, emptyLine, FormattingFunctions, isHitSampleXY } from "@lightningchart/lcjs"
 import { useEffect, useContext, useId } from "react"
 import { LCContext } from "./LC"
 
@@ -28,8 +28,9 @@ export default function Charts() {
     }
 
     // Initial range selector values
-    const [feStart, feEnd] = [20, 35]
-    const [pStart, pEnd] = [18, 100]
+    // const [feStart, feEnd] = [4, 6.25]
+    const [pStart, pEnd] = [24, 100]
+    const [hpStart, hpEnd] = [200, 540]
     
     // Parallel coordinate chart - car characteristics
     const parallelChart = lc
@@ -48,18 +49,19 @@ export default function Charts() {
         Weight: 2, 
         FuelEfficiency: 3 
       }
-      parallelChart
-        .setAxes(Axes)
-        .setLUT({
+      parallelChart.setAxes(Axes)
+      parallelChart.getAxis(Axes.FuelEfficiency).setInterval({ start: 1.50, end: 6.25 })
+      parallelChart.setLUT({
           axis: parallelChart.getAxis(Axes.FuelEfficiency),
           lut: new LUT({
             interpolate: true,
-            steps: regularColorSteps(5, 35, theme.examples.badGoodColorPalette),
+            steps: regularColorSteps(1.50, 6.25, theme.examples.badGoodColorPalette),
           }),
         })
       // Initial range selector
-      parallelChart.getAxis(Axes.FuelEfficiency).addRangeSelector().setInterval(feStart, feEnd)
+      // parallelChart.getAxis(Axes.FuelEfficiency).addRangeSelector().setInterval(feStart, feEnd)
       parallelChart.getAxis(Axes.Price).addRangeSelector().setInterval(pStart, pEnd)
+      parallelChart.getAxis(Axes.Horsepower).addRangeSelector().setInterval(hpStart, hpEnd)
 
     // Horizontal bar chart - Models by manufacturer
     const modelsChart = lc
@@ -75,9 +77,7 @@ export default function Charts() {
       .setCornerRadius(undefined) 
       .setPadding({ left: 20, right: 20, top: 0, bottom: 10 })
 
-      modelsChart.valueAxis.setTickStrategy(AxisTickStrategies.Numeric, ticks => ticks
-        .setMajorFormattingFunction((value) => `${value.toFixed(1)}`)
-      )
+      modelsChart.valueAxis.setTickStrategy(AxisTickStrategies.Numeric, (ticks) => ticks.setMajorFormattingFunction(FormattingFunctions.NumericUnits))
 
     // Vertical bar chart - Average price per fuel type
     const fuelPriceChart = lc
@@ -99,20 +99,20 @@ export default function Charts() {
         .setMajorFormattingFunction((value) => `${value.toFixed(0)}`)
       )
 
-    // Scatter chart - Weight vs fuel efficiency
+    // Scatter chart - Fuel efficiency vs weight
     const weightFEChart = lc
       .ChartXY({ 
         theme: Themes.darkGold, 
         container: wfContainer, 
         textRenderer: htmlTextRenderer, 
       })
-      .setTitle("Weight vs Fuel Efficiency")
+      .setTitle("Fuel Efficiency vs Weight")
       .setCursorMode('show-nearest')
       .setPadding({ left: 10, right: 10, top: 10, bottom: 10 })
       .setTitleMargin({ bottom: 10 })
 
-      const wAxisX = weightFEChart.getDefaultAxisX().setTitle("Weight (kg)")
-      const wAxisY = weightFEChart.getDefaultAxisY().setTitle("Fuel Efficiency (km/L)")
+      const wAxisX = weightFEChart.getDefaultAxisX().setTitle("Fuel Efficiency (km/kWh)")
+      const wAxisY = weightFEChart.getDefaultAxisY().setTitle("Weight (kg)")
       wAxisY.setTickStrategy(AxisTickStrategies.Numeric, ticks => ticks
         .setMajorFormattingFunction((value) => `${value.toFixed(0)}`)
       )
@@ -159,7 +159,7 @@ export default function Charts() {
       const boxByFuel = {}
       const pointsByFuel = {}
       const hpTicksByFuel = {} 
-      const fuelsOrdered = ["Electric", "Petrol", "Hybrid", "Diesel"]
+      const fuelsOrdered = ["Petrol", "Diesel", "Electric", "Hybrid"]
 
       fuelsOrdered.forEach((fuel, i) => {
         const tick = hpAxisX.addCustomTick()  
@@ -203,10 +203,11 @@ export default function Charts() {
       .then((data) => {
         if (disposed) return
 
-        // Update parallel chart 
-        data.forEach((sample) =>
-          parallelChart.addSeries().setName(`${sample.Manufacturer} ${sample.Model}`).setData(sample)
-        )
+        // Update parallel chart
+        data.forEach((sample) => {
+          const series = parallelChart.addSeries()
+          series.setName(`${sample.Manufacturer} ${sample.Model} (${sample.Fuel})`).setData(sample)
+        })
 
         // Update horizontal bar chart
         function updateModelsChart(samples) {
@@ -273,8 +274,8 @@ export default function Charts() {
           const byFuel = samples.reduce((grouped, s) => {
             const f = s.Fuel || "Unknown"
             if (!grouped[f]) grouped[f] = { x: [], y: [] }
-            const x = Number(s.Weight)
-            const y = Number(s.FuelEfficiency)
+            const x = Number(s.FuelEfficiency)
+            const y = Number(s.Weight)
             if (Number.isFinite(x) && Number.isFinite(y)) {
               grouped[f].x.push(x)
               grouped[f].y.push(y)
@@ -288,8 +289,8 @@ export default function Charts() {
           })
 
           // Adjust axes ranges dynamically
-          const allX = samples.map((s) => Number(s.Weight)).filter(Number.isFinite)
-          const allY = samples.map((s) => Number(s.FuelEfficiency)).filter(Number.isFinite)
+          const allX = samples.map((s) => Number(s.FuelEfficiency)).filter(Number.isFinite)
+          const allY = samples.map((s) => Number(s.Weight)).filter(Number.isFinite)
           if (allX.length && allY.length) {
             wAxisX.setInterval({ start: Math.min(...allX), end: Math.max(...allX) })
             wAxisY.setInterval({ start: Math.min(...allY), end: Math.max(...allY) })
@@ -368,7 +369,8 @@ export default function Charts() {
         }
 
         // Initial selection
-        const initialSelected = data.filter((d) => d.FuelEfficiency >= feStart && d.FuelEfficiency <= feEnd && d.Price >= pStart && d.Price <= pEnd)
+        // const initialSelected = data.filter((d) => d.FuelEfficiency >= feStart && d.FuelEfficiency <= feEnd && d.Price >= pStart && d.Price <= pEnd)
+        const initialSelected = data.filter((d) => d.Price >= pStart && d.Price <= pEnd && d.Horsepower >= hpStart && d.Horsepower <= hpEnd)
         updateModelsChart(initialSelected)
         updateAvgPriceChart(initialSelected)
         updateScatterChart(initialSelected)
