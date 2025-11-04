@@ -111,8 +111,8 @@ export default function Charts() {
       .setPadding({ left: 10, right: 10, top: 10, bottom: 10 })
       .setTitleMargin({ bottom: 10 })
 
-      const wAxisX = weightFEChart.getDefaultAxisX().setTitle("Fuel Efficiency (km/kWh)")
-      const wAxisY = weightFEChart.getDefaultAxisY().setTitle("Weight (kg)")
+      const wAxisX = weightFEChart.getDefaultAxisX().setTitle("Weight (kg)")
+      const wAxisY = weightFEChart.getDefaultAxisY().setTitle("Fuel Efficiency (km/kWh)")
       wAxisY.setTickStrategy(AxisTickStrategies.Numeric, ticks => ticks
         .setMajorFormattingFunction((value) => `${value.toFixed(0)}`)
       )
@@ -274,8 +274,8 @@ export default function Charts() {
           const byFuel = samples.reduce((grouped, s) => {
             const f = s.Fuel || "Unknown"
             if (!grouped[f]) grouped[f] = { x: [], y: [] }
-            const x = Number(s.FuelEfficiency)
-            const y = Number(s.Weight)
+            const x = Number(s.Weight)
+            const y = Number(s.FuelEfficiency)
             if (Number.isFinite(x) && Number.isFinite(y)) {
               grouped[f].x.push(x)
               grouped[f].y.push(y)
@@ -289,8 +289,8 @@ export default function Charts() {
           })
 
           // Adjust axes ranges dynamically
-          const allX = samples.map((s) => Number(s.FuelEfficiency)).filter(Number.isFinite)
-          const allY = samples.map((s) => Number(s.Weight)).filter(Number.isFinite)
+          const allX = samples.map((s) => Number(s.Weight)).filter(Number.isFinite)
+          const allY = samples.map((s) => Number(s.FuelEfficiency)).filter(Number.isFinite)
           if (allX.length && allY.length) {
             wAxisX.setInterval({ start: Math.min(...allX), end: Math.max(...allX) })
             wAxisY.setInterval({ start: Math.min(...allY), end: Math.max(...allY) })
