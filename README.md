@@ -81,7 +81,7 @@ npm start
 
 ### Dependencies
 - **Core**: React 19.2.0
-- **Visualization**: @lightningchart/lcjs ^8.0.2
+- **Visualization**: @lightningchart/lcjs 8.1.0
 
 ## Links
 - [LightningChart JS Official Website](https://lightningchart.com/js-charts/)
